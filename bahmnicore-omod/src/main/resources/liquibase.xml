@@ -3848,6 +3848,7 @@
             update global_property set property='bahmni.extraPatientIdentifierTypes' where property='emr.extraPatientIdentifierTypes';
         </sql>
     </changeSet>
+
     <changeSet id="create-auditlogtable-201703211430" author="Shruthi,Salauddin">
         <preConditions onFail="MARK_RAN">
             <not>
@@ -3871,4 +3872,10 @@
 
         </sql>
     </changeSet>
+
+    <changeSet id="bahmni-core-201611141540" author="Pankaj, Sidtharthan">
+        <comment>Update the search query to consider patient identifiers created by patient merge</comment>
+        <sqlFile path="V1_95_PatientSearchSql.sql"/>
+    </changeSet>
+    
 </databaseChangeLog>
