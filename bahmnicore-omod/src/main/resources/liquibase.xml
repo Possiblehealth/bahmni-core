@@ -3959,6 +3959,11 @@
             INSERT IGNORE INTO role_privilege (role, privilege) SELECT * FROM (SELECT 'Clinical-App-Read-Only', 'Get Forms') AS tmp WHERE EXISTS ( SELECT role FROM role WHERE role = 'Clinical-App-Read-Only' );
         </sql>
     </changeSet>
+
+    <changeSet id="bahmni-core-201611141540" author="Pankaj, Sidtharthan">
+        <comment>Update the search query to consider patient identifiers created by patient merge</comment>
+        <sqlFile path="V1_99_PatientSearchSql.sql"/>
+    </changeSet>
     
     <changeSet author="sidtharthanan, Darius" id="20170302-1225">
         <preConditions onFail="MARK_RAN">
