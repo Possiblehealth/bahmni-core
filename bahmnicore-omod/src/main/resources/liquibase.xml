@@ -3825,9 +3825,52 @@
         <sqlFile path="V1_98_WardsListSql.sql"/>
     </changeSet>
 
-    <changeSet id="bahmni-core-201611141540" author="Pankaj, Sidtharthan">
-        <comment>Update the search query to consider patient identifiers created by patient merge</comment>
-        <sqlFile path="V1_95_PatientSearchSql.sql"/>
+    <changeSet id="bahmni-201703061748" author="Shruthi P, Pushpa">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(property) FROM global_property WHERE property='emr.primaryIdentifierType';
+            </sqlCheck>
+        </preConditions>
+        <comment>update global property key 'emr.primaryIdentifierType' to 'bahmni.primaryIdentifierType'</comment>
+        <sql>
+            UPDATE global_property SET property='bahmni.primaryIdentifierType' where property='emr.primaryIdentifierType';
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-201703061756" author="Shruthi P, Pushpa">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(property) FROM global_property where property='emr.extraPatientIdentifierTypes';
+            </sqlCheck>
+        </preConditions>
+        <comment>update global property key 'emr.extraPatientIdentifierTypes' to 'bahmni.extraPatientIdentifierTypes'</comment>
+        <sql>
+            update global_property set property='bahmni.extraPatientIdentifierTypes' where property='emr.extraPatientIdentifierTypes';
+        </sql>
+    </changeSet>
+
+    <changeSet id="create-auditlogtable-201703211430" author="Shruthi,Salauddin">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="audit_log" />
+            </not>
+        </preConditions>
+
+        <sql>
+            CREATE TABLE audit_log (
+            audit_log_id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+            user_id INT(11) NOT NULL,
+            patient_id INT(11),
+            event_type VARCHAR(100) NOT NULL,
+            message LONGBLOB NOT NULL,
+            date_created DATETIME NOT NULL,
+            uuid VARCHAR(38) NOT NULL UNIQUE,
+
+            FOREIGN KEY fk_patient_id(patient_id) REFERENCES patient(patient_id),
+            FOREIGN KEY fk_user_id(user_id) REFERENCES users(user_id)
+            );
+
+        </sql>
     </changeSet>
     
     <changeSet id="20170308-1000" author="Sidtharthan, Gaurav">
@@ -3852,5 +3895,546 @@
             where property = 'conditionList.nonCodedUuid';
         </sql>
     </changeSet>
+
+    <changeSet id="bahmni-core-201705041200" author="Bindu">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(*) from global_property where property_value='en, es, fr, it, pt';
+            </sqlCheck>
+        </preConditions>
+        <comment>Renaming 'pt' to 'pt_BR' for locale.allowed.list property in global_property table</comment>
+        <sql>
+            update global_property set property_value='en, es, fr, it, pt_BR' where property_value='en, es, fr, it, pt';
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-core-201704191128" author="Shashi, Gautam">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">select count(*) from privilege where privilege='Edit conditions'</sqlCheck>
+        </preConditions>
+        <sql>
+            set @uuid = '';
+            select uuid() into @uuid;
+            insert into privilege(privilege, description, uuid) values('Edit conditions', 'Privilege to add or edit conditions', @uuid);
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-core-201704191135" author="Shashi, Gautam">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">select count(*) from privilege where privilege='Get conditions'</sqlCheck>
+        </preConditions>
+        <sql>
+            set @uuid = '';
+            select uuid() into @uuid;
+            insert into privilege(privilege, description, uuid) values('Get conditions', 'Privilege to view conditions', @uuid);
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-core-201704191140" author="Shashi, Gautam">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(privilege) FROM role_privilege WHERE privilege = 'Edit conditions' and role = 'Clinical-App-Save'</sqlCheck>
+        </preConditions>
+        <comment>Add privileges to roles Clinical-App-Save(Edit Conditions)</comment>
+        <sql>
+            INSERT IGNORE INTO role_privilege (role, privilege) SELECT * FROM (SELECT 'Clinical-App-Save', 'Edit conditions') AS tmp WHERE EXISTS ( SELECT role FROM role WHERE role = 'Clinical-App-Save' );
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-core-201704191145" author="Shashi, Gautam">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(privilege) FROM role_privilege WHERE privilege = 'Get conditions' and role = 'Clinical-App-Read-Only'</sqlCheck>
+        </preConditions>
+        <comment>Add privileges to roles Clinical-App-Read-Only(Get conditions) </comment>
+        <sql>
+            INSERT IGNORE INTO role_privilege (role, privilege) SELECT * FROM (SELECT 'Clinical-App-Read-Only', 'Get conditions') AS tmp WHERE EXISTS ( SELECT role FROM role WHERE role = 'Clinical-App-Read-Only' );
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-core-201704211500" author="Shashi, Sicong">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(privilege) FROM role_privilege WHERE privilege = 'Get Forms' and role = 'Clinical-App-Read-Only'</sqlCheck>
+        </preConditions>
+        <comment>Add privileges to roles Clinical-App-Read-Only(Get Forms) </comment>
+        <sql>
+            INSERT IGNORE INTO role_privilege (role, privilege) SELECT * FROM (SELECT 'Clinical-App-Read-Only', 'Get Forms') AS tmp WHERE EXISTS ( SELECT role FROM role WHERE role = 'Clinical-App-Read-Only' );
+        </sql>
+    </changeSet>
     
+    <changeSet author="sidtharthanan, Darius" id="20170302-1225">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM concept where concept_id in (select concept_id from concept_name where
+                name = 'Follow-up Condition' AND concept_name_type = 'FULLY_SPECIFIED' AND voided = FALSE) and
+                retired = FALSE;
+            </sqlCheck>
+        </preConditions>
+        <comment>Add new concept for Follow-up Condition</comment>
+        <sql>
+            set @concept_id = 0;
+            set @answer_concept_id = 0;
+            set @concept_name_short_id = 0;
+            set @concept_name_full_id = 0;
+            
+            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id, 'Follow-up Condition',
+            'Follow-up Condition', 'Text', 'Misc', false);
+        </sql>
+    </changeSet>
+
+    <changeSet id="20170829-1138" author="Suman M">
+        <comment>Update global property to handle null for family name</comment>
+        <sql>
+            UPDATE global_property
+            SET property_value = REPLACE(property_value, "pn.family_name", "ifnull(pn.family_name,'')")
+            WHERE global_property.property_value LIKE '%pn.family_name%';
+        </sql>
+    </changeSet>
+
+    <changeSet id="Create-privilege-appointments-app-201709201731"  author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">select count(*) from privilege where privilege='app:appointments'</sqlCheck>
+        </preConditions>
+        <comment>Adding privilege for Appointments Module</comment>
+        <sql>
+            INSERT INTO privilege (privilege, description, uuid) VALUES ('app:appointments', 'Able to view Appointments module', uuid());
+        </sql>
+    </changeSet>
+
+    <changeSet id="Create-privilege-appointments-manage-201709201740"  author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">select count(*) from privilege where privilege='app:appointments:manageAppointmentsTab'</sqlCheck>
+        </preConditions>
+        <comment>Adding privilege for managing appointments in appointments Module</comment>
+        <sql>
+            INSERT INTO privilege (privilege, description, uuid) VALUES ('app:appointments:manageAppointmentsTab', 'Able to manage appointments in appointments module', uuid());
+        </sql>
+    </changeSet>
+
+    <changeSet id="Create-privilege-appointments-admin-201709201813"  author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">select count(*) from privilege where privilege='app:appointments:adminTab'</sqlCheck>
+        </preConditions>
+        <comment>Adding privilege for managing services in appointments Module</comment>
+        <sql>
+            INSERT INTO privilege (privilege, description, uuid) VALUES ('app:appointments:adminTab', 'Able to manage services in appointments module', uuid());
+        </sql>
+    </changeSet>
+
+    <changeSet id="create-readonly-role-appointments-201709201830" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role WHERE role = 'Appointments:ReadOnly';
+            </sqlCheck>
+        </preConditions>
+        <comment>Creating new role Appointments: ReadOnly for Appointments module</comment>
+        <sql>
+            INSERT INTO role(role, description, uuid) VALUES ("Appointments:ReadOnly", "Ability to view appointments in appointments module", uuid());
+        </sql>
+    </changeSet>
+    <changeSet id="create-manage-role-appointments-201709201838" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role WHERE role = 'Appointments:ManageAppointments';
+            </sqlCheck>
+        </preConditions>
+        <comment>Creating new role Appointments: Manage for Appointments module</comment>
+        <sql>
+            INSERT INTO role(role, description, uuid) VALUES ("Appointments:ManageAppointments", "Ability to manage appointments in appointments module", uuid());
+        </sql>
+    </changeSet>
+    <changeSet id="create-fullaccess-role-appointments-201709201815" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role WHERE role = 'Appointments:FullAccess';
+            </sqlCheck>
+        </preConditions>
+        <comment>Creating new role for Full Access to Appointments module</comment>
+        <sql>
+            INSERT INTO role(role, description, uuid) VALUES ("Appointments:FullAccess", "Ability to manage appointments and services in appointments module", uuid());
+        </sql>
+    </changeSet>
+
+    <changeSet id="201710061600" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "app:appointments";
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ReadOnly";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:ReadOnly" AND privilege = "app:appointments";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding app:appointments privilege to Appointments: ReadOnly role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:ReadOnly", "app:appointments");
+        </sql>
+    </changeSet>
+    <changeSet id="201710061610" author="Santhosh, Pramida">
+        <preConditions onFail="CONTINUE">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "View Appointments";
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ReadOnly";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:ReadOnly" AND privilege="View Appointments";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding View Appointments privilege to Appointments: ReadOnly role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:ReadOnly", "View Appointments");
+        </sql>
+    </changeSet>
+    <changeSet id="201710061620" author="Santhosh, Pramida">
+        <preConditions onFail="CONTINUE">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "View Appointment Services";
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ReadOnly";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:ReadOnly" AND privilege ="View Appointment Services";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding all the privileges to Appointments: ReadOnly</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:ReadOnly", "View Appointment Services");
+        </sql>
+    </changeSet>
+    <changeSet id="201710061630" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ReadOnly";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM role_privilege WHERE role = 'Appointments:ReadOnly' AND privilege = 'Get Locations';
+            </sqlCheck>
+        </preConditions>
+        <comment>adding Get Locations privilege to Appointments:ReadOnly role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ('Appointments:ReadOnly', 'Get Locations');
+        </sql>
+    </changeSet>
+    <changeSet id="201710061640" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ReadOnly";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM role_privilege WHERE role = 'Appointments:ReadOnly' AND privilege = 'Get Patients';
+            </sqlCheck>
+        </preConditions>
+        <comment>adding Get Patients privilege to Appointments:ReadOnly role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ('Appointments:ReadOnly', 'Get Patients');
+        </sql>
+    </changeSet>
+    <changeSet id="201710061650" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ReadOnly";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM role_privilege WHERE role = 'Appointments:ReadOnly' AND privilege = 'Get Patient Identifiers';
+            </sqlCheck>
+        </preConditions>
+        <comment>adding Get Patient Identifiers privilege to Appointments:ReadOnly role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ('Appointments:ReadOnly', 'Get Patient Identifiers');
+        </sql>
+    </changeSet>
+    <changeSet id="201710061700" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ReadOnly";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM role_privilege WHERE role = 'Appointments:ReadOnly' AND privilege = 'Get Providers';
+            </sqlCheck>
+        </preConditions>
+        <comment>adding Get Providers privilege to Appointments:ReadOnly role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ('Appointments:ReadOnly', 'Get Providers');
+        </sql>
+    </changeSet>
+
+
+    <changeSet id="201710061710" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "app:appointments:manageAppointmentsTab";
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ManageAppointments";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:ManageAppointments" AND privilege = "app:appointments:manageAppointmentsTab";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding app:appointments:manageAppointmentsTab privilege to Appointments:ManageAppointments role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:ManageAppointments", "app:appointments:manageAppointmentsTab");
+        </sql>
+    </changeSet>
+    <changeSet id="201710061720" author="Santhosh, Pramida">
+        <preConditions onFail="CONTINUE">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "Manage Appointments";
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:ManageAppointments";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:ManageAppointments" AND privilege = "Manage Appointments";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding Manage Appointments privilege to Appointments:ManageAppointments role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:ManageAppointments", "Manage Appointments");
+        </sql>
+    </changeSet>
+
+    <changeSet id="201710061730" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "app:appointments:adminTab";
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:FullAccess";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:FullAccess" AND privilege = "app:appointments:adminTab";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding app:appointments:adminTab privilege to Appointments:FullAccess</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:FullAccess", "app:appointments:adminTab");
+        </sql>
+    </changeSet>
+    <changeSet id="201710061740" author="Santhosh, Pramida">
+        <preConditions onFail="CONTINUE">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "Manage Appointment Services";
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM role WHERE role = "Appointments:FullAccess";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:FullAccess" AND privilege = "Manage Appointment Services";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding Manage Appointment Services privilege to Appointments:FullAccess</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:FullAccess", "Manage Appointment Services");
+        </sql>
+    </changeSet>
+
+    <changeSet id="201710061750" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM role_role WHERE child_role = 'Appointments:ManageAppointments' AND parent_role = 'Appointments:ReadOnly';
+            </sqlCheck>
+        </preConditions>
+        <comment>adding Appointments:ReadOnly as parent role for Appointments:ManageAppointments role to inherit all privileges from Appointments:ReadOnly</comment>
+        <sql>
+            INSERT INTO role_role(child_role, parent_role) VALUES ('Appointments:ManageAppointments', 'Appointments:ReadOnly');
+        </sql>
+    </changeSet>
+    <changeSet id="201710061800" author="Santhosh, Pramida">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM role_role WHERE child_role = 'Appointments:FullAccess' AND parent_role = 'Appointments:ManageAppointments';
+            </sqlCheck>
+        </preConditions>
+        <comment>adding Appointments:ManageAppointments as parent role for Appointments:FullAccess role to inherit all privileges from Appointments:ManageAppointments</comment>
+        <sql>
+            INSERT INTO role_role(child_role, parent_role) VALUES ('Appointments:FullAccess', 'Appointments:ManageAppointments');
+        </sql>
+    </changeSet>
+    <changeSet id="Amman-201707101139" author="Shireesha, Pramida" context="rel3.2">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role where role = "OT: FullAccess";
+            </sqlCheck>
+        </preConditions>
+        <comment> Creating a role for OT: FullAccess</comment>
+        <sql>
+            INSERT INTO role(role, description, uuid) VALUES ("OT: FullAccess", "Ability to access and modify OT schedules", uuid());
+        </sql>
+    </changeSet>
+    <changeSet id="Amman-201707101152" author="Shireesha, Pramida" context="rel3.2">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role where role = "OT: ReadOnly";
+            </sqlCheck>
+        </preConditions>
+        <comment> Creating a role for OT- ReadOnly</comment>
+        <sql>
+            INSERT INTO role(role, description, uuid) VALUES ("OT: ReadOnly", "Ability to access and modify OT schedules", uuid());
+        </sql>
+    </changeSet>
+    <changeSet id="Amman-201707101154" author="Shireesha, Pramida" context="rel3.2">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM privilege where privilege = "app:ot";
+            </sqlCheck>
+        </preConditions>
+        <comment> Creating a privilege for viewing the OT module</comment>
+        <sql>
+            INSERT INTO privilege(privilege, description, uuid) VALUES ("app:ot", "Ability to view OT module", uuid());
+        </sql>
+    </changeSet>
+    <changeSet id="Amman-201707101156" author="Shireesha, Pramida" context="rel3.2">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM privilege where privilege = "app:ot:write";
+            </sqlCheck>
+        </preConditions>
+        <comment> Creating a privilege for viewing the OT module</comment>
+        <sql>
+            INSERT INTO privilege(privilege, description, uuid) VALUES ("app:ot:write", "Ability to view new surgical block and other buttons to edit on OT module", uuid());
+        </sql>
+    </changeSet>
+    <changeSet id="Amman-201707101106" author="Shireesha, Pramida" context="rel3.2">
+        <preConditions onFail="CONTINUE">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "Manage OT Schedules";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "OT: FullAccess" AND privilege = "Manage OT Schedules";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding Manage OT Schedules privilege to OT: FullAccess role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("OT: FullAccess", "Manage OT Schedules");
+            INSERT INTO role_privilege(role, privilege) VALUES ("OT: FullAccess", "View OT Schedules");
+            INSERT INTO role_privilege(role, privilege) VALUES ("OT: FullAccess", "app:ot");
+            INSERT INTO role_privilege(role, privilege) VALUES ("OT: FullAccess", "app:ot:write");
+        </sql>
+    </changeSet>
+    <changeSet id="Amman-201707101159" author="Shireesha, Pramida" context="rel3.2">
+        <preConditions onFail="CONTINUE">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "View OT Schedules";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "OT: ReadOnly" AND privilege = "View OT Schedules";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding view OT Schedules privilege to OT: ReadOnly role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("OT: ReadOnly", "View OT Schedules");
+            INSERT INTO role_privilege(role, privilege) VALUES ("OT: ReadOnly", "app:ot");
+        </sql>
+    </changeSet>
+    <changeSet id="201805112235" author="Suman">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM concept_view WHERE concept_full_name = 'Bahmni Initial Diagnosis';
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM concept WHERE is_set= TRUE AND concept_id = (SELECT concept_id FROM concept_view
+                WHERE concept_full_name = 'Bahmni Initial Diagnosis');
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM concept_set WHERE concept_set = (SELECT concept_id FROM concept_view
+                WHERE concept_full_name = 'Bahmni Initial Diagnosis');
+            </sqlCheck>
+        </preConditions>
+        <comment>Updating 'Bahmni Initial Diagnosis' concept to non-set concept</comment>
+        <sql>
+            SET @concept_id=0;
+            SELECT concept_id FROM concept_view WHERE concept_full_name = 'Bahmni Initial Diagnosis' INTO @concept_id;
+            UPDATE concept SET is_set = FALSE WHERE concept_id = @concept_id;
+        </sql>
+    </changeSet>
+    <changeSet id="201805112237" author="Suman">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM concept_view WHERE concept_full_name = 'Bahmni Diagnosis Status';
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM concept WHERE is_set= TRUE AND concept_id = (SELECT concept_id FROM concept_view
+                WHERE concept_full_name = 'Bahmni Diagnosis Status');
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM concept_set WHERE concept_set = (SELECT concept_id FROM concept_view
+                WHERE concept_full_name = 'Bahmni Diagnosis Status');
+            </sqlCheck>
+        </preConditions>
+        <comment>Updating 'Bahmni Diagnosis Status' concept to non-set concept</comment>
+        <sql>
+            SET @concept_id=0;
+            SELECT concept_id FROM concept_view WHERE concept_full_name = 'Bahmni Diagnosis Status' INTO @concept_id;
+            UPDATE concept SET is_set = FALSE WHERE concept_id = @concept_id;
+        </sql>
+    </changeSet>
+    <changeSet id="201805112239" author="Suman">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM concept_view WHERE concept_full_name = 'Bahmni Diagnosis Revised';
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM concept WHERE is_set= TRUE AND concept_id = (SELECT concept_id FROM concept_view
+                WHERE concept_full_name = 'Bahmni Diagnosis Revised');
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM concept_set WHERE concept_set = (SELECT concept_id FROM concept_view
+                WHERE concept_full_name = 'Bahmni Diagnosis Revised');
+            </sqlCheck>
+        </preConditions>
+        <comment>Updating 'Bahmni Diagnosis Revised' concept to non-set concept</comment>
+        <sql>
+            SET @concept_id=0;
+            SELECT concept_id FROM concept_view WHERE concept_full_name = 'Bahmni Diagnosis Revised' INTO @concept_id;
+            UPDATE concept SET is_set = FALSE WHERE concept_id = @concept_id;
+        </sql>
+    </changeSet>
+    <changeSet id="BAM-20180830150635" author="Angshu" runOnChange="true" context="release0.91">
+        <comment>Override SQL query for Get Patient Details in Ward</comment>
+        <sqlFile path="BahmniBMPatientListInWard.sql"/>
+    </changeSet>
+
+    <changeSet id="201905101200" author="Angshu,Bindu">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                select count(*) from scheduler_task_config where schedulable_class= "org.openmrs.module.emrapi.adt.CloseStaleVisitsTask" and name = "Close Stale Visits Task"; </sqlCheck>
+        </preConditions>
+        <comment> Add Bahmni preferred EMR API scheduler which closes stale visits </comment>
+        <insert tableName="scheduler_task_config">
+                <column name="name" value="Close Stale Visits Task" />
+                <column name="description" value="Auto close visit task after number of hours specified by emrapi.visitExpireHours" />
+                <column name="schedulable_class" value="org.openmrs.module.emrapi.adt.CloseStaleVisitsTask" />
+                <column name="start_on_startup" valueBoolean="true" />
+                <column name="start_time_pattern" value="MM/dd/yyyy HH:mm:ss" />
+                <column name="start_time" valueDate="2014-04-30T23:59:59" />
+                <column name="repeat_interval" value="86400" />
+                <column name="date_created" valueDate="CURRENT_TIMESTAMP" />
+                <column name="created_by" value="1" />
+                <column name="uuid" valueComputed="uuid()" />
+        </insert>
+    </changeSet>
+    <changeSet id="openmrs-atomfeed-offset-marker-201906032013" author="Angshu,Bindu" context="r0.92">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                select count(*) from scheduler_task_config where schedulable_class= "org.openmrs.module.atomfeed.scheduler.tasks.EventPublisherTask" and name = "OpenMRS event publisher task";
+            </sqlCheck>
+        </preConditions>
+        <comment>adding OpenMRS event publisher task scheduler</comment>
+        <insert tableName="scheduler_task_config">
+            <column name="name" value="OpenMRS event publisher task"/>
+            <column name="schedulable_class" value="org.openmrs.module.atomfeed.scheduler.tasks.EventPublisherTask"/>
+            <column name="start_time" valueDate=" now() "/>
+            <column name="start_time_pattern" value="MM/dd/yyyy HH:mm:ss"/>
+            <column name="repeat_interval" value="5"/>
+            <column name="start_on_startup" value="1"/>
+            <column name="started" value="1"/>
+            <column name="created_by" value="1"/>
+            <column name="date_created" valueDate=" now() "/>
+            <column name="uuid" valueComputed=" uuid() "/>
+        </insert>
+    </changeSet>
 </databaseChangeLog>

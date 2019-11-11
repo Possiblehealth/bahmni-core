@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-@Lazy //to get rid of cyclic dependencies
+@Lazy //to toString rid of cyclic dependencies
 public class BahmniPatientServiceImpl implements BahmniPatientService {
     private PersonService personService;
     private ConceptService conceptService;
@@ -50,6 +50,24 @@ public class BahmniPatientServiceImpl implements BahmniPatientService {
     @Override
     public List<PatientResponse> search(PatientSearchParameters searchParameters) {
         return patientDao.getPatients(searchParameters.getIdentifier(),
+                searchParameters.getName(),
+                searchParameters.getCustomAttribute(),
+                searchParameters.getAddressFieldName(),
+                searchParameters.getAddressFieldValue(),
+                searchParameters.getLength(),
+                searchParameters.getStart(),
+                searchParameters.getPatientAttributes(),
+                searchParameters.getProgramAttributeFieldValue(),
+                searchParameters.getProgramAttributeFieldName(),
+                searchParameters.getAddressSearchResultFields(),
+                searchParameters.getPatientSearchResultFields(),
+                searchParameters.getLoginLocationUuid(),
+                searchParameters.getFilterPatientsByLocation(), searchParameters.getFilterOnAllIdentifiers());
+    }
+
+    @Override
+    public List<PatientResponse> luceneSearch(PatientSearchParameters searchParameters) {
+        return patientDao.getPatientsUsingLuceneSearch(searchParameters.getIdentifier(),
                 searchParameters.getName(),
                 searchParameters.getCustomAttribute(),
                 searchParameters.getAddressFieldName(),

@@ -5,12 +5,17 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.bahmni.module.bahmnicore.BahmniCoreException;
+import org.bahmni.module.bahmnicore.bahmniexceptions.FileTypeNotSupportedException;
 import org.bahmni.module.bahmnicore.bahmniexceptions.VideoFormatNotSupportedException;
 import org.bahmni.module.bahmnicore.model.VideoFormats;
 import org.bahmni.module.bahmnicore.properties.BahmniCoreProperties;
 import org.bahmni.module.bahmnicore.service.PatientDocumentService;
+import org.bahmni.module.bahmnicore.service.ThumbnailGenerator;
 import org.imgscalr.Scalr;
+import org.jcodec.common.model.Picture;
+import org.jcodec.scale.AWTUtil;
 import org.openmrs.module.webservices.rest.web.RestUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +24,10 @@ import org.springframework.stereotype.Service;
 import javax.imageio.ImageIO;
 import javax.xml.bind.DatatypeConverter;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -35,6 +38,16 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
     private static final String patientImagesFormat = "jpeg";
     private final Integer NO_OF_PATIENT_FILE_IN_A_DIRECTORY = 100;
     private final String VIDEO_FILE_TYPE = "video";
+    private final String IMAGE_FILE_TYPE = "image";
+
+    protected void setThumbnailGenerators(List<ThumbnailGenerator> thumbnailGenerators) {
+        this.thumbnailGenerators = thumbnailGenerators;
+    }
+
+    @Autowired
+    List<ThumbnailGenerator> thumbnailGenerators;
+
+
 
     @Override
     public void saveImage(String patientIdentifier, String image) {
@@ -53,7 +66,7 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
         try {
             if (content == null || content.isEmpty()) return null;
 
-            String basePath = BahmniCoreProperties.getProperty("bahmnicore.documents.baseDirectory");
+            String basePath = getBasePath();
             String relativeFilePath = createFilePath(basePath, patientId, encounterTypeName, format);
 
             File outputFile = new File(String.format("%s/%s", basePath, relativeFilePath));
@@ -64,6 +77,10 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
         } catch (IOException e) {
             throw new BahmniCoreException("[%s] : Could not save patient Document ", e);
         }
+    }
+
+    private String getBasePath() {
+        return BahmniCoreProperties.getProperty("bahmnicore.documents.baseDirectory");
     }
 
     private String createFileName(Integer patientId, String encounterTypeName, Object format) {
@@ -94,15 +111,27 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
             if (!isVideoFormatSupported(format)) {
                 throw new VideoFormatNotSupportedException(String.format("The video format '%s' is not supported. Supported formats are %s", format, Arrays.toString(VideoFormats.values())));
             }
+
             FileUtils.writeByteArrayToFile(outputFile, decodedBytes);
+            createAndSaveThumbnailForVideo(outputFile, format);
+
         } else if (PDF.equals(format)) {
             FileUtils.writeByteArrayToFile(outputFile, decodedBytes);
+        } else if (IMAGE_FILE_TYPE.equals(fileType)){
+            try {
+                BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(decodedBytes));
+                boolean results = ImageIO.write(bufferedImage, format, outputFile);
+                if(!results) {
+                    throw new FileTypeNotSupportedException(String.format("The image format '%s' is not supported. Supported formats are %s", format, Arrays.toString(new String[]{"png", "jpeg", "gif"})));
+                }
+                saveThumbnail(bufferedImage, outputFile, null, 100);
+                bufferedImage.flush();
+                log.info(String.format("Successfully created patient image at %s", outputFile));
+            } catch (Exception exception) {
+                throw new FileTypeNotSupportedException(String.format("The image format '%s' is not supported. Supported formats are %s", format, Arrays.toString(new String[]{"png", "jpeg", "gif"})));
+            }
         } else {
-            BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(decodedBytes));
-            ImageIO.write(bufferedImage, format, outputFile);
-            createThumbnail(bufferedImage, outputFile);
-            bufferedImage.flush();
-            log.info(String.format("Successfully created patient image at %s", outputFile));
+            throw new FileTypeNotSupportedException(String.format("The file type is not supported. Supported types are %s/%s/%s", IMAGE_FILE_TYPE, VIDEO_FILE_TYPE, PDF));
         }
     }
 
@@ -110,12 +139,34 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
         return VideoFormats.isFormatSupported(format);
     }
 
-    private void createThumbnail(BufferedImage image, File outputFile) throws IOException {
+
+    private void createAndSaveThumbnailForVideo(File outputVideoFile, String format) throws IOException {
+        ThumbnailGenerator thumbnailGenerator = getSupportedThumbnailGenerator(format);
+        BufferedImage bufferedImage = null;
+        if(thumbnailGenerator != null) {
+            bufferedImage = thumbnailGenerator.generateThumbnail(outputVideoFile);
+            saveThumbnail(bufferedImage, outputVideoFile, "jpg", 300);
+        }
+    }
+
+    private ThumbnailGenerator getSupportedThumbnailGenerator(String format) throws IOException {
+        for(ThumbnailGenerator thumbnailGenerator: thumbnailGenerators) {
+            if (thumbnailGenerator.isFormatSupported(format)) {
+             return thumbnailGenerator;
+            }
+        }
+        return null;
+    }
+
+    private void saveThumbnail(BufferedImage image, File outputFile, String imageFileType, int imageSize) throws IOException {
         String nameWithoutExtension = FilenameUtils.removeExtension(outputFile.getAbsolutePath());
-        String extension = FilenameUtils.getExtension(outputFile.getAbsolutePath());
-        File thumbnailFile = new File(String.format("%s_thumbnail.%s", nameWithoutExtension, extension));
-        BufferedImage reSizedImage = Scalr.resize(image, 100);
-        ImageIO.write(reSizedImage, extension, thumbnailFile);
+        if(imageFileType == null){
+        imageFileType = FilenameUtils.getExtension(outputFile.getAbsolutePath());
+        }
+        File thumbnailFile = new File(String.format("%s_thumbnail.%s", nameWithoutExtension, imageFileType));
+        BufferedImage reSizedImage = Scalr.resize(image, imageSize);
+        ImageIO.write(reSizedImage, imageFileType, thumbnailFile);
+        image.flush();
         reSizedImage.flush();
     }
 
@@ -123,6 +174,28 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
     public ResponseEntity<Object> retriveImage(String patientUuid) {
         File file = getPatientImageFile(patientUuid);
         return readImage(file);
+    }
+
+    @Override
+    public void delete(String fileName) {
+        File file = new File(getBasePath() + "/" + fileName);
+        deleteThumbnailFile(file);
+        deleteFile(file);
+    }
+
+    private void deleteThumbnailFile(File file) {
+        String absolutePath = file.getAbsolutePath();
+        String nameWithoutExtension = FilenameUtils.removeExtension(absolutePath);
+        String extension = FilenameUtils.getExtension(absolutePath);
+        FileUtils.deleteQuietly(new File(String.format("%s_thumbnail.%s", nameWithoutExtension, extension)));
+    }
+
+    private void deleteFile(File file) {
+        boolean deleted = FileUtils.deleteQuietly(file);
+        if (deleted)
+            log.info(String.format("%s file is deleted successfully", file.getAbsolutePath()));
+        else
+            log.warn(String.format("Unable to delete %s", file.getAbsolutePath()));
     }
 
     private File getPatientImageFile(String patientUuid) {

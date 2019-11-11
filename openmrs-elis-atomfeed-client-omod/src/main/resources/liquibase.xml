@@ -104,4 +104,17 @@
             INSERT INTO visit_type (name, description, creator, uuid, date_created) VALUES ('LAB VISIT', 'Visits for lab visit by patient when the tests are not ordered through OpenMRS', 1, uuid(), curdate());
         </sql>
     </changeSet>
+
+    <changeSet id="elis-atomfeed-5-201906032010" author="Angshu,Bindu" context="r0.92">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                select count(*) from scheduler_task_config where schedulable_class= "org.bahmni.module.elisatomfeedclient.api.task.OpenElisPatientFeedTask" and name = "OpenElis Patient Atom Feed Task";
+            </sqlCheck>
+        </preConditions>
+        <comment>rel3</comment>
+        <sql>
+            INSERT INTO scheduler_task_config(name, schedulable_class, start_time, start_time_pattern, repeat_interval, start_on_startup, started, created_by, date_created, uuid)
+            VALUES ('OpenElis Patient Atom Feed Task', 'org.bahmni.module.elisatomfeedclient.api.task.OpenElisPatientFeedTask', now(), 'MM/dd/yyyy HH:mm:ss', 15, 1, 1, 1,  curdate(), uuid());
+        </sql>
+    </changeSet>
 </databaseChangeLog>
