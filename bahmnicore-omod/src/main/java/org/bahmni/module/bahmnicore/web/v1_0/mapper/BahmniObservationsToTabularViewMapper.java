@@ -36,7 +36,7 @@ public class BahmniObservationsToTabularViewMapper {
         return pivotTable;
     }
 
-    boolean isNonNullRow(String groupByConcept, PivotRow pivotRow) {
+    protected boolean isNonNullRow(String groupByConcept, PivotRow pivotRow) {
         Map<String, ArrayList<BahmniObservation>> pivotRowColumns = pivotRow.getColumns();
         boolean nonNullRow = false;
 
@@ -71,7 +71,7 @@ public class BahmniObservationsToTabularViewMapper {
         }
     }
 
-    void addColumn(Set<EncounterTransaction.Concept> conceptNames, PivotRow row, final BahmniObservation observation) {
+    protected void addColumn(Set<EncounterTransaction.Concept> conceptNames, PivotRow row, final BahmniObservation observation) {
         Object foundElement = CollectionUtils.find(conceptNames, new Predicate() {
             @Override
             public boolean evaluate(Object o) {

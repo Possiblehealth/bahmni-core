@@ -98,7 +98,6 @@ public class FormUtilTest {
         assertEquals(1, obs.size());
         assertEquals(observation, obs.get(0));
     }
-
     @Test
     public void shouldReturnParentFormFieldPathForGivenFormFieldPath() {
         String expectedFormNameWithVersion = "FormName.1";
@@ -127,3 +126,4 @@ public class FormUtilTest {
         assertEquals(expectedFormNameWithVersion, actualFormNameWithVersion);
     }
 }
+

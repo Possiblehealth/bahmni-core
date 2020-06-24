@@ -33,6 +33,4 @@ public interface BahmniObsService {
 
     BahmniObservation getBahmniObservationByUuid(String observationUuid);
     BahmniObservation getRevisedBahmniObservationByUuid(String observationUuid);
-
-    Collection<BahmniObservation> getObsForFormBuilderForms(String patientUuid, List<String> formNames, Integer numberOfVisits, Date startDate, Date endDate, String patientProgramUuid);
 }

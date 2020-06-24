@@ -4,7 +4,6 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.openmrs.module.emrapi.utils.CustomJsonDateSerializer;
 
 import java.util.Date;
-import java.util.HashMap;
 
 public class Resource {
     private String id;
@@ -12,9 +11,6 @@ public class Resource {
     private Date lastUpdated;
     private String name;
     private Boolean isActive;
-
-    @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
-    private HashMap<String, Object> properties;
 
     public String getName() {
         return name;
@@ -56,14 +52,6 @@ public class Resource {
 
     public void setLastUpdated(Date lastUpdated) {
         this.lastUpdated = lastUpdated;
-    }
-
-    public HashMap<String, Object> getProperties() {
-        return properties;
-    }
-
-    public void setProperties(HashMap<String, Object> properties) {
-        this.properties = properties;
     }
 
 }
