@@ -27,10 +27,9 @@ public class FormUtil {
         return observations != null ? observations.stream().filter(obs -> isNotBlank(obs.getFormFieldPath()))
                 .collect(Collectors.toList()) : Collections.emptyList();
     }
-
-    public static String getFormNameAlongWithVersion(String formFieldPath) {
+    public static String getParentFormFieldPath(String formFieldPath) {
         return isNotBlank(formFieldPath) && formFieldPath.contains("/")
-                ? formFieldPath.substring(0, formFieldPath.indexOf("/")) : "";
+                ? formFieldPath.substring(0, formFieldPath.lastIndexOf("/")) : "";
     }
 }
 

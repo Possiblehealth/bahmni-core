@@ -19,6 +19,7 @@ import static org.bahmni.module.referencedata.labconcepts.model.event.ConceptSer
 import static org.bahmni.module.referencedata.labconcepts.model.event.ConceptServiceEventFactory.testEvent;
 import static org.bahmni.module.referencedata.labconcepts.model.event.ConceptServiceEventFactory.saleableTypeEvent;
 
+
 public class Operation {
 
     private String name;
